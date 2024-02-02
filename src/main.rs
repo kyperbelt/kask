@@ -156,6 +156,7 @@ fn main() {
                     println!("Task list {} removed successfully", list);
                 }
                 ConfigCommand::Info {} => {
+                    println!("Configuration File: {}", utils::get_config_file_path().unwrap());
                     println!("Current task list: {}", config.current_tasks_list);
                     println!("Task Lists:");
                     for (list, path) in config.tasks_lists_paths.iter() {

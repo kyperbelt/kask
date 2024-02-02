@@ -112,58 +112,21 @@ fn new_kask_config() -> KaskConfig {
 }
 
 pub fn get_kask_config_file() -> Option<KaskConfig> {
-    // search for the environment variable
-    let env_config_file = env::var(CONFIG_FILE_ENV_VAR);
-
-    // if env variable found then load it and return it
-    if let Ok(path_from_var) = env_config_file {
-        // if the file exists then load it
-        if let Ok(file_string) = fs::read_to_string(&path_from_var) {
-            let config: KaskConfig = serde_json::from_str(&file_string).unwrap();
-            return Some(config);
-        };
-        let config = new_kask_config();
-        let config_json_string = serde_json::to_string(&config).unwrap();
-        if let Err(error) = fs::write(&path_from_var, config_json_string) {
-            println!("Error creating config file: {}", error);
-            return None;
-        };
-
-        return Some(config);
-    };
-
-    // if env variable not found then search for a file in a folder ~/.config/kask/kask.config
-
-    let file_path: String = format!("{}/.config/kask/kask.config", env::var("HOME").unwrap());
-    if let Ok(file_string) = fs::read_to_string(&file_path) {
-        let config: KaskConfig = serde_json::from_str(&file_string).unwrap();
-        return Some(config);
-    };
-    // if that file is not found then search for a local file named kask.config
-    if let Ok(file_string) = fs::read_to_string("kask.config") {
-        let config: KaskConfig = serde_json::from_str(&file_string).unwrap();
-        println!(
-            "Using local config at {}/kask.config",
-            env::current_dir()
-                .unwrap_or(PathBuf::from("."))
-                .as_path()
-                .to_str()
-                .unwrap()
-        );
-        return Some(config);
-    };
-
-    // if thats not found then create a local file named kask.config 
-    let config = new_kask_config();
-    let config_json_string = serde_json::to_string(&config).unwrap();
-    if let Err(error) = fs::write("kask.config", config_json_string) {
-        println!("Error creating local kask.config file: {}", error);
+    let config_file_path = get_config_file_path();
+    if config_file_path.is_none() {
         return None;
-    };
+    }
 
-    println!("Created new local kask.config file.");
+    let config_file_path = config_file_path.unwrap();
+    let config_file = fs::read_to_string(&config_file_path);
+    if config_file.is_err() {
+        eprintln!("Error reading file: {}", config_file.unwrap_err());
+        return None;
+    }
 
-    return Some(config);
+    let config_file = config_file.unwrap();
+    let config: KaskConfig = serde_json::from_str(&config_file).unwrap();
+    Some(config)
 }
 
 pub fn write_config_to_file(config: KaskConfig) -> Result<(), std::io::Error> {
@@ -171,13 +134,13 @@ pub fn write_config_to_file(config: KaskConfig) -> Result<(), std::io::Error> {
     fs::write(get_config_file_path().unwrap(), config_json_string)
 }
 
-fn get_config_file_path() -> Option<String> {
+pub fn get_config_file_path() -> Option<String> {
     // search for the environment variable
     let env_config_file = env::var(CONFIG_FILE_ENV_VAR);
 
     // if env variable found then load it and return it
     if let Ok(path_from_var) = env_config_file {
-        return Some(path_from_var);
+        return Some(Path::new(&path_from_var).canonicalize().unwrap().to_str().unwrap().to_string());
     };
 
     // if env variable not found then search for a file in a folder ~/.config/kask/kask.config
