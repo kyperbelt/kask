@@ -140,3 +140,30 @@ pub fn get_cask_config_file() -> Option<KaskConfig> {
     return Some(config);
 }
 
+pub fn write_config_to_file(config: KaskConfig)->Result<(), std::io::Error>{
+    let config_json_string = serde_json::to_string(&config).unwrap();
+    fs::write(get_config_file_path().unwrap(), config_json_string)
+}
+
+fn get_config_file_path() -> Option<String> {
+    // search for the environment variable
+    let env_config_file = env::var(CONFIG_FILE_ENV_VAR);
+
+    // if env variable found then load it and return it
+    if let Ok(path_from_var) = env_config_file {
+        return Some(path_from_var);
+    };
+
+    // if env variable not found then search for a file in a folder ~/.config/kask/kask.config
+    let file_path: String = format!("{}/.config/kask/kask.config", env::var("HOME").unwrap());
+    if fs::metadata(&file_path).is_ok() {
+        return Some(file_path);
+    };
+
+    // if that file is not found then search for a local file named kask.config
+    if fs::metadata("kask.config").is_ok() {
+        return Some("kask.config".to_string());
+    };
+
+    return None;
+}

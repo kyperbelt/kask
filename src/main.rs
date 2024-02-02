@@ -100,56 +100,72 @@ fn main() {
             tags,
             count,
         } => {
-            // if start date is not specified then use today's date
-            let start_date: NaiveDate = if start_date.is_none() {
-                let today = Local::now();
-                NaiveDate::from_ymd_opt(today.date_naive().year(), today.month(), today.day())
-                    .unwrap()
-            } else {
-                NaiveDate::parse_from_str(&start_date.unwrap(), "%m/%d/%y").unwrap()
-            };
-
-            // if end date is not specified then search for task from start date until end of time.
-            let end_date: NaiveDate = if end_date.is_none() {
-                NaiveDate::from_ymd_opt(9999, 12, 31).unwrap()
-            } else {
-                NaiveDate::parse_from_str(&end_date.unwrap(), "%m/%d/%y").unwrap()
-            };
-
-            let mut filtered_tasks = tasks
-                .into_iter()
-                .filter(|task| {
-                    let task_date = NaiveDate::parse_from_str(&task.date, "%m/%d/%y").unwrap();
-                    task_date >= start_date && task_date <= end_date
-                })
-                .collect::<Vec<Task>>();
-
-            filtered_tasks.sort_by(|a, b| {
-                let a_title = &a.name;
-                let b_title = &b.name;
-                let a_distance = strsim::levenshtein(a_title, &query);
-                let b_distance = strsim::levenshtein(b_title, &query);
-                a_distance.cmp(&b_distance)
-            });
-
-            // only print out the top ten results
-            println!("Searching for tasks with query: {}", query);
-            println!("Start Date: {}", start_date.format("%m/%d/%y"));
-            println!("End Date: {}", end_date.format("%m/%d/%y"));
-            println!("Top {} results", std::cmp::min(count, filtered_tasks.len() as u32));
-            println!("-----------------");
-            println!("{:>3}| {:>30} {:^11}", "ID", "Name", "Date");
-            for task in filtered_tasks.iter().take(count as usize) {
-                println!("{:>3}| {:>30} {:^11}", task.id, task.name, task.date);
-            }
-
-
+            list::search_tasks(tasks, query, start_date, end_date, tags, count);
         }
-        TaskCommand::Config { config_command } => {}
+        TaskCommand::Config { config_command } => {
+            match config_command {
+                ConfigCommand::Set { list } => {
+                    if !config.tasks_lists_paths.contains_key(&list) {
+                        println!("Error: Task list {} does not exist", list);
+                        return;
+                    }
+                    let mut new_config = config.clone();
+                    new_config.current_tasks_list = list.clone();
+                    if let Err(error) = utils::write_config_to_file(new_config){
+                        println!("Error: {}", error);
+                        return;
+                    };
+                    println!("Current task list set to {}", list);
+                }
+                ConfigCommand::Add { list, path } => {
+                    if config.tasks_lists_paths.contains_key(&list) {
+                        println!("Error: Task list {} already exists", list);
+                        return;
+                    }
+                    // check if file exists and if it does not then create it and 
+                    // notify the user that the file was created
+                    if !std::path::Path::new(&path).exists() {
+                        if let Err(error) = std::fs::File::create(&path) {
+                            println!("Error: {}", error);
+                            return;
+                        }
+                        println!("File {} created successfully", path);
+                    }
+
+                    let mut new_config = config.clone();
+                    new_config.tasks_lists_paths.insert(list.clone(), path);
+                    if let Err(error) = utils::write_config_to_file(new_config){
+                        println!("Error: {}", error);
+                        return;
+                    };
+                    println!("Task list {} added successfully", list);
+                }
+                ConfigCommand::Remove { list } => {
+                    if !config.tasks_lists_paths.contains_key(&list) {
+                        println!("Error: Task list {} does not exist", list);
+                        return;
+                    }
+                    let mut new_config = config.clone();
+                    new_config.tasks_lists_paths.remove(&list);
+                    if let Err(error) = utils::write_config_to_file(new_config){
+                        println!("Error: {}", error);
+                        return;
+                    };
+                    println!("Task list {} removed successfully", list);
+                }
+                ConfigCommand::Info {} => {
+                    println!("Current task list: {}", config.current_tasks_list);
+                    println!("Task lists:");
+                    for (list, path) in config.tasks_lists_paths.iter() {
+                        println!("{}: {}", list, path);
+                    }
+                }
+            }
+        }
     }
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone,Serialize, Deserialize)]
 struct KaskConfig {
     current_tasks_list: String,
     tasks_lists_paths: HashMap<String, String>,
@@ -219,7 +235,7 @@ enum TaskCommand {
         #[clap(long)]
         tags: Option<Vec<String>>,
         #[clap(short, long, default_value = "10")]
-        count: u32
+        count: u32,
     },
     /// Configuration commands
     Config {

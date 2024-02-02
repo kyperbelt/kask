@@ -1,15 +1,61 @@
-use chrono::{Datelike, NaiveDate};
+use chrono::{Datelike, Local, NaiveDate};
 use clap::ValueEnum;
 
 use crate::Task;
-
-
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Debug)]
 pub enum ShowMode {
     NotDone, // shows only not done this is the default
     All,     // shows done and not done
     Done,    // shows only done
+}
+
+// search_tasks(tasks, query, start_date, end_date, tags, count);
+pub fn search_tasks(tasks: Vec<Task>, query: String, start_date: Option<String>, end_date: Option<String>, tags: Option<Vec<String>>, count: u32) {
+    // if start date is not specified then use today's date
+    let start_date: NaiveDate = if start_date.is_none() {
+        let today = Local::now();
+        NaiveDate::from_ymd_opt(today.date_naive().year(), today.month(), today.day()).unwrap()
+    } else {
+        NaiveDate::parse_from_str(&start_date.unwrap(), "%m/%d/%y").unwrap()
+    };
+
+    // if end date is not specified then search for task from start date until end of time.
+    let end_date: NaiveDate = if end_date.is_none() {
+        NaiveDate::from_ymd_opt(9999, 12, 31).unwrap()
+    } else {
+        NaiveDate::parse_from_str(&end_date.unwrap(), "%m/%d/%y").unwrap()
+    };
+
+    let mut filtered_tasks = tasks
+        .into_iter()
+        .filter(|task| {
+            let task_date = NaiveDate::parse_from_str(&task.date, "%m/%d/%y").unwrap();
+            task_date >= start_date && task_date <= end_date
+        })
+        .collect::<Vec<Task>>();
+
+    filtered_tasks.sort_by(|a, b| {
+        let a_title = &a.name;
+        let b_title = &b.name;
+        let a_distance = strsim::levenshtein(a_title, &query);
+        let b_distance = strsim::levenshtein(b_title, &query);
+        a_distance.cmp(&b_distance)
+    });
+
+    // only print out the top ten results
+    println!("Searching for tasks with query: {}", query);
+    println!("Start Date: {}", start_date.format("%m/%d/%y"));
+    println!("End Date: {}", end_date.format("%m/%d/%y"));
+    println!(
+        "Top {} results",
+        std::cmp::min(count, filtered_tasks.len() as u32)
+    );
+    println!("-----------------");
+    println!("{:>3}| {:>30} {:^11}", "ID", "Name", "Date");
+    for task in filtered_tasks.iter().take(count as usize) {
+        println!("{:>3}| {:>30} {:^11}", task.id, task.name, task.date);
+    }
 }
 
 pub fn list_tasks(tasks: Vec<Task>, today: bool, week: bool, month: bool, show_mode: ShowMode) {
