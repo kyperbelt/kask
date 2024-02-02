@@ -3,10 +3,9 @@ mod edit;
 mod list;
 mod utils;
 
-use std::collections::HashMap;
 use std::str::FromStr;
+use std::{collections::HashMap, path::PathBuf};
 
-use chrono::{Datelike, Local, NaiveDate};
 use clap::{Parser, Subcommand};
 use list::ShowMode;
 use serde::{Deserialize, Serialize};
@@ -15,12 +14,12 @@ const DEFAULT_TIME: &str = "11:59pm";
 const CONFIG_FILE_ENV_VAR: &str = "KASK_CONFIG_FILE";
 
 fn main() {
-    let config_option = utils::get_cask_config_file();
+    let args: Args = Args::parse();
+
+    let config_option = utils::get_kask_config_file();
     if let None = config_option {
         return;
     };
-
-    let args: Args = Args::parse();
 
     let config = config_option.unwrap();
 
@@ -51,8 +50,9 @@ fn main() {
             week,
             month,
             show_mode,
+            count,
         } => {
-            list::list_tasks(tasks, today, week, month, show_mode);
+            list::list_tasks(tasks, today, week, month, show_mode, count);
         }
         TaskCommand::Update {
             id,
@@ -111,7 +111,7 @@ fn main() {
                     }
                     let mut new_config = config.clone();
                     new_config.current_tasks_list = list.clone();
-                    if let Err(error) = utils::write_config_to_file(new_config){
+                    if let Err(error) = utils::write_config_to_file(new_config) {
                         println!("Error: {}", error);
                         return;
                     };
@@ -122,7 +122,7 @@ fn main() {
                         println!("Error: Task list {} already exists", list);
                         return;
                     }
-                    // check if file exists and if it does not then create it and 
+                    // check if file exists and if it does not then create it and
                     // notify the user that the file was created
                     if !std::path::Path::new(&path).exists() {
                         if let Err(error) = std::fs::File::create(&path) {
@@ -133,8 +133,12 @@ fn main() {
                     }
 
                     let mut new_config = config.clone();
-                    new_config.tasks_lists_paths.insert(list.clone(), path);
-                    if let Err(error) = utils::write_config_to_file(new_config){
+                    let path = PathBuf::from(path).canonicalize().unwrap();
+                    new_config.tasks_lists_paths.insert(
+                        list.clone(),
+                        path.to_str().unwrap().to_string(),
+                    );
+                    if let Err(error) = utils::write_config_to_file(new_config) {
                         println!("Error: {}", error);
                         return;
                     };
@@ -147,7 +151,7 @@ fn main() {
                     }
                     let mut new_config = config.clone();
                     new_config.tasks_lists_paths.remove(&list);
-                    if let Err(error) = utils::write_config_to_file(new_config){
+                    if let Err(error) = utils::write_config_to_file(new_config) {
                         println!("Error: {}", error);
                         return;
                     };
@@ -155,9 +159,9 @@ fn main() {
                 }
                 ConfigCommand::Info {} => {
                     println!("Current task list: {}", config.current_tasks_list);
-                    println!("Task lists:");
+                    println!("Task Lists:");
                     for (list, path) in config.tasks_lists_paths.iter() {
-                        println!("{}: {}", list, path);
+                        println!("\t{}: {}", list, path);
                     }
                 }
             }
@@ -165,7 +169,7 @@ fn main() {
     }
 }
 
-#[derive(Clone,Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct KaskConfig {
     current_tasks_list: String,
     tasks_lists_paths: HashMap<String, String>,
@@ -194,16 +198,25 @@ enum TaskCommand {
         #[clap(long)]
         tags: Option<Vec<String>>,
     },
-    /// List tasks from the current list
+    /// List tasks from the current list. Tasks will be sorted by date and by time
+    /// completed tasks will not be shown by default. Use the --show-mode option to
+    /// change this behavior
     List {
+        /// Show tasks for today
         #[clap(short, long, group = "list_group")]
         today: bool,
+        /// Show tasks for the current week
         #[clap(short, long, group = "list_group")]
         week: bool,
+        /// Show tasks for the current month
         #[clap(short, long, group = "list_group")]
         month: bool,
+        /// Show mode
         #[clap(short, long, value_enum, default_value = "not-done")]
         show_mode: ShowMode,
+        /// Number of tasks to display
+        #[clap(short, long, default_value = "10")]
+        count: u32,
     },
     /// Update a task from the current list by its id
     Update {

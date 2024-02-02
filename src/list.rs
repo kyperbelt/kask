@@ -58,7 +58,7 @@ pub fn search_tasks(tasks: Vec<Task>, query: String, start_date: Option<String>,
     }
 }
 
-pub fn list_tasks(tasks: Vec<Task>, today: bool, week: bool, month: bool, show_mode: ShowMode) {
+pub fn list_tasks(tasks: Vec<Task>, today: bool, week: bool, month: bool, show_mode: ShowMode, count: u32) {
     let today_value = chrono::Local::now().date_naive();
     let mut tasks_to_show: Vec<Task> = Vec::new();
     if show_mode == ShowMode::All {
@@ -100,12 +100,25 @@ pub fn list_tasks(tasks: Vec<Task>, today: bool, week: bool, month: bool, show_m
             })
             .collect();
     }
+
+    // sort tthe asks by date and then by time 
+    tasks_to_show.sort_by(|a, b| {
+        let a_date = NaiveDate::parse_from_str(&a.date, "%m/%d/%y").unwrap();
+        let b_date = NaiveDate::parse_from_str(&b.date, "%m/%d/%y").unwrap();
+        if a_date == b_date {
+            a.time.cmp(&b.time)
+        } else {
+            a_date.cmp(&b_date)
+        }
+    });
+
+
     println!(
         "{:>3}|{:^20} {:^13} {:^7} {:^11}",
         "ID", "Name", "Due Date", "Time", "Done"
     );
     println!("-------------------------------------------------------------");
-    for task in tasks_to_show {
+    for task in tasks_to_show.iter().take(count as usize){
         println!(
             "{:>3}|{:^20}|{:^13} {:^7} {:^11}",
             task.id, task.name, task.date, task.time, task.done,

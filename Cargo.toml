@@ -1,5 +1,6 @@
 [package]
-name = "tasktracking_tool"
+name = "kask"
+description = "A command line task tracking tool"
 version = "0.1.0"
 edition = "2021"
 
