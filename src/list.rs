@@ -1,5 +1,6 @@
 use chrono::{Datelike, Local, NaiveDate};
 use clap::ValueEnum;
+use prettytable::{Table, Row, Cell};
 
 use crate::Task;
 
@@ -31,7 +32,16 @@ pub fn search_tasks(tasks: Vec<Task>, query: String, start_date: Option<String>,
         .into_iter()
         .filter(|task| {
             let task_date = NaiveDate::parse_from_str(&task.date, "%m/%d/%y").unwrap();
-            task_date >= start_date && task_date <= end_date
+            if task_date >= start_date && task_date <= end_date {
+                // check the normalized levenstein distance and if it is less than 0.5 then return true
+                let dist = strsim::normalized_levenshtein(&task.name, &query);
+                if dist > 0.25 || task.name.contains(&query) {
+                    return true;
+                }
+
+                return false;
+            }
+            return false;
         })
         .collect::<Vec<Task>>();
 
@@ -47,18 +57,14 @@ pub fn search_tasks(tasks: Vec<Task>, query: String, start_date: Option<String>,
     println!("Searching for tasks with query: {}", query);
     println!("Start Date: {}", start_date.format("%m/%d/%y"));
     println!("End Date: {}", end_date.format("%m/%d/%y"));
-    println!(
+    let title = format!(
         "Top {} results",
         std::cmp::min(count, filtered_tasks.len() as u32)
     );
-    println!("-----------------");
-    println!("{:>3}| {:>30} {:^11}", "ID", "Name", "Date");
-    for task in filtered_tasks.iter().take(count as usize) {
-        println!("{:>3}| {:>30} {:^11}", task.id, task.name, task.date);
-    }
+    table_print_tasks(filtered_tasks.into_iter().take(count as usize).collect(), &title);
 }
 
-pub fn list_tasks(tasks: Vec<Task>, today: bool, week: bool, month: bool, show_mode: ShowMode, count: u32) {
+pub fn list_tasks(tasks: Vec<Task>, today: bool, week: bool, month: bool, show_mode: ShowMode, count: u32, list_name: String) {
     let today_value = chrono::Local::now().date_naive();
     let mut tasks_to_show: Vec<Task> = Vec::new();
     if show_mode == ShowMode::All {
@@ -112,16 +118,17 @@ pub fn list_tasks(tasks: Vec<Task>, today: bool, week: bool, month: bool, show_m
         }
     });
 
+    tasks_to_show = tasks_to_show.into_iter().take(count as usize).collect();
+    table_print_tasks(tasks_to_show, &list_name);
+}
 
-    println!(
-        "{:>3}|{:^20} {:^13} {:^7} {:^11}",
-        "ID", "Name", "Due Date", "Time", "Done"
-    );
-    println!("-------------------------------------------------------------");
-    for task in tasks_to_show.iter().take(count as usize){
-        println!(
-            "{:>3}|{:^20}|{:^13} {:^7} {:^11}",
-            task.id, task.name, task.date, task.time, task.done,
-        );
+fn table_print_tasks(tasks: Vec<Task>, title: &str) {
+    let mut table = Table::new();
+    println!("\n");
+    println!("{}:", title);
+    table.set_titles(row!["ID", "Name", "Date", "Time", "Done"]);
+    for task in tasks {
+        table.add_row(row![task.id, task.name, task.date, task.time, task.done]);
     }
+    table.printstd();
 }

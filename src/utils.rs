@@ -120,7 +120,6 @@ pub fn get_kask_config_file() -> Option<KaskConfig> {
         // if the file exists then load it
         if let Ok(file_string) = fs::read_to_string(&path_from_var) {
             let config: KaskConfig = serde_json::from_str(&file_string).unwrap();
-            println!("Using config file at {}", &path_from_var);
             return Some(config);
         };
         let config = new_kask_config();
@@ -138,7 +137,6 @@ pub fn get_kask_config_file() -> Option<KaskConfig> {
     let file_path: String = format!("{}/.config/kask/kask.config", env::var("HOME").unwrap());
     if let Ok(file_string) = fs::read_to_string(&file_path) {
         let config: KaskConfig = serde_json::from_str(&file_string).unwrap();
-        println!("Using config file at {}", &file_path);
         return Some(config);
     };
     // if that file is not found then search for a local file named kask.config
@@ -155,7 +153,7 @@ pub fn get_kask_config_file() -> Option<KaskConfig> {
         return Some(config);
     };
 
-    // if thats not found then create a local file named kask.config and create it.
+    // if thats not found then create a local file named kask.config 
     let config = new_kask_config();
     let config_json_string = serde_json::to_string(&config).unwrap();
     if let Err(error) = fs::write("kask.config", config_json_string) {

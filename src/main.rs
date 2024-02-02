@@ -1,3 +1,4 @@
+#[macro_use] extern crate prettytable;
 mod create;
 mod edit;
 mod list;
@@ -25,9 +26,6 @@ fn main() {
 
     let current_list = &config.current_tasks_list;
     let current_list_path = &config.tasks_lists_paths[current_list];
-    println!("current list: {}", current_list);
-    println!("current list path: {}", current_list_path);
-    println!("-------------------------------------------------------------");
     let mut tasks = utils::load_tasks_from_file(current_list_path);
 
     match args.task_command {
@@ -52,7 +50,7 @@ fn main() {
             show_mode,
             count,
         } => {
-            list::list_tasks(tasks, today, week, month, show_mode, count);
+            list::list_tasks(tasks, today, week, month, show_mode, count, current_list.clone());
         }
         TaskCommand::Update {
             id,
