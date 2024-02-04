@@ -24,10 +24,10 @@ pub fn write_tasks_to_file(filename: &str, tasks: Vec<Task>) {
         let store_string: String = format!(
             "{}, {}, {}, {}, {}, {}, {}",
             task.id,
-            task.name,
-            task.date,
-            task.time,
-            task.description,
+            task.name.trim().to_string(),
+            task.date.trim().to_string(),
+            task.time.trim().to_string(),
+            task.description.trim().to_string(),
             task.done.to_string(),
             task.tags.join("; ")
         );
